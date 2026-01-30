@@ -36,7 +36,11 @@ This skill helps users give their AI agents:
 ## Required Libraries
 
 ```bash
+# Core (identity + Lightning)
 npm install nostr-tools @getalby/sdk @noble/hashes
+
+# On-chain Bitcoin (optional)
+npm install bitcoinjs-lib ecpair tiny-secp256k1
 ```
 
 ## Setup Instructions
@@ -290,8 +294,73 @@ try {
 }
 ```
 
+## On-Chain Bitcoin
+
+For larger transactions or cold storage, use on-chain Bitcoin instead of Lightning.
+
+### When to Use On-Chain
+- Amounts > $1000
+- Cold storage / savings
+- Final settlement
+- No channel limits needed
+
+### Generate Bitcoin Address
+
+Your Nostr keypair uses the same secp256k1 curve as Bitcoin:
+
+```javascript
+import * as bitcoin from 'bitcoinjs-lib';
+import * as ecc from 'tiny-secp256k1';
+import { ECPairFactory } from 'ecpair';
+import { hexToBytes } from '@noble/hashes/utils';
+
+bitcoin.initEccLib(ecc);
+const ECPair = ECPairFactory(ecc);
+
+const keyPair = ECPair.fromPrivateKey(
+  Buffer.from(hexToBytes(process.env.NOSTR_SECRET_KEY))
+);
+
+const { address } = bitcoin.payments.p2wpkh({
+  pubkey: keyPair.publicKey,
+  network: bitcoin.networks.bitcoin,
+});
+
+console.log('Bitcoin Address:', address);
+// bc1q...
+```
+
+### Check Balance
+
+```javascript
+async function getBalance(address) {
+  const res = await fetch(`https://mempool.space/api/address/${address}`);
+  const data = await res.json();
+  return data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum;
+}
+```
+
+### Get Fee Rates
+
+```javascript
+const fees = await fetch('https://mempool.space/api/v1/fees/recommended')
+  .then(r => r.json());
+console.log('Fast:', fees.fastestFee, 'sat/vB');
+console.log('Medium:', fees.halfHourFee, 'sat/vB');
+```
+
+### On-Chain vs Lightning
+
+| Feature | Lightning | On-Chain |
+|---------|-----------|----------|
+| Speed | Instant | 10+ min |
+| Fees | <1 sat | 200+ sats |
+| Max amount | Channel limit | Unlimited |
+| Best for | Microtx | Large amounts |
+
 ## Resources
 
 - Website: https://startwithbitcoin.com
 - Guides: https://startwithbitcoin.com/guides
+- On-Chain Guide: https://startwithbitcoin.com/guides/onchain
 - GitHub: https://github.com/bramkanstein/startwithbitcoin
