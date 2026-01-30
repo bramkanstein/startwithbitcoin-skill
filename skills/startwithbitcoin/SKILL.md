@@ -41,6 +41,7 @@ Everything needed exists and is free:
 |------|---------|-----|
 | Alby | Lightning wallet with NWC | https://getalby.com |
 | Alby MCP Server | Connect wallet to Claude | https://github.com/getAlby/mcp |
+| Lightning Enable MCP | MCP for Python/.NET | https://github.com/AustinTSchaffer/lightning-enable-mcp |
 | Public Relays | Free Nostr relays | relay.damus.io, nos.lol |
 | NWC Faucet | Test wallets | https://faucet.nwc.dev |
 | Alby Sandbox | Explore payments | https://sandbox.albylabs.com |

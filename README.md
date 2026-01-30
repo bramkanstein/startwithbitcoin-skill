@@ -27,9 +27,12 @@ Everything you need exists and is free right now:
 |------|---------|-----|
 | **Alby** | Lightning wallet with NWC | https://getalby.com |
 | **Alby MCP Server** | Connect wallet to Claude | https://github.com/getAlby/mcp |
+| **Lightning Enable MCP** | MCP for Python/.NET | https://github.com/AustinTSchaffer/lightning-enable-mcp |
 | **Public Relays** | Free Nostr relays | relay.damus.io, nos.lol |
 | **NWC Faucet** | Test wallets | https://faucet.nwc.dev |
 | **Alby Sandbox** | Explore payments | https://sandbox.albylabs.com |
+
+Know a tool that should be listed? [Suggest it on GitHub](https://github.com/bramkanstein/startwithbitcoin/issues/new?title=Tool%20Suggestion)
 
 ## What This Skill Does
 
@@ -251,7 +254,8 @@ For Nostr communication:
 
 ## Related Projects
 
-- [Alby MCP Server](https://github.com/getAlby/mcp) - Connect wallet to Claude
+- [Alby MCP Server](https://github.com/getAlby/mcp) - Connect wallet to Claude (JavaScript)
+- [Lightning Enable MCP](https://github.com/AustinTSchaffer/lightning-enable-mcp) - MCP for Python/.NET
 - [nostr-tools](https://github.com/nbd-wtf/nostr-tools) - Nostr protocol library
 - [@getalby/sdk](https://github.com/getAlby/js-sdk) - Alby SDK with NWC support
 - [Awesome NWC](https://github.com/getAlby/awesome-nwc) - NWC resources
