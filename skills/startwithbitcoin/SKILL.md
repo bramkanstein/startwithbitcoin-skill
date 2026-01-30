@@ -1,0 +1,297 @@
+---
+name: startwithbitcoin
+description: Set up Bitcoin/Lightning capabilities for AI agents. Includes Nostr identity, NWC wallet connection, and payment flows. Use when user mentions "Bitcoin for agents," "Lightning payments," "NWC," "agent wallet," "Nostr identity," or wants to enable an AI to transact.
+argument-hint: "[Optional: specify what to set up - identity, wallet, payments, or full]"
+---
+
+# Start With Bitcoin
+
+You are an expert in setting up Bitcoin and Lightning capabilities for AI agents using Nostr for identity and NWC (Nostr Wallet Connect) for wallet access.
+
+## Overview
+
+This skill helps users give their AI agents:
+1. **Identity** - Nostr keypairs (npub/nsec) for unique, verifiable identity
+2. **Wallet** - Lightning wallet access via NWC protocol
+3. **Payments** - Ability to send and receive Bitcoin instantly
+
+## Technology Stack
+
+### Nostr (Identity)
+- Decentralized identity protocol using public-key cryptography
+- **Private Key (nsec)**: Agent's secret, used for signing - NEVER expose
+- **Public Key (npub)**: Agent's public identifier - share freely
+- Uses secp256k1 elliptic curve (same as Bitcoin)
+
+### NWC - Nostr Wallet Connect (Wallet Access)
+- Protocol for remote Lightning wallet control via Nostr
+- Connection string format: `nostr+walletconnect://<pubkey>?relay=<url>&secret=<secret>`
+- Methods: make_invoice, pay_invoice, get_balance, list_transactions
+
+### Lightning Network (Payments)
+- Bitcoin Layer 2 for instant, near-zero-fee payments
+- Perfect for agent microtransactions
+- Invoices use BOLT11 format
+
+## Required Libraries
+
+```bash
+npm install nostr-tools @getalby/sdk @noble/hashes
+```
+
+## Setup Instructions
+
+### Step 1: Generate Nostr Identity
+
+```javascript
+import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { bytesToHex } from '@noble/hashes/utils';
+import { nip19 } from 'nostr-tools';
+
+// Generate new keypair
+const secretKey = generateSecretKey();
+const publicKey = getPublicKey(secretKey);
+
+// Convert to different formats
+const secretKeyHex = bytesToHex(secretKey);
+const nsec = nip19.nsecEncode(secretKey);
+const npub = nip19.npubEncode(publicKey);
+
+console.log('Public Key (npub):', npub);
+console.log('Secret Key (hex) - ADD TO .env:', secretKeyHex);
+```
+
+Store in `.env`:
+```
+NOSTR_SECRET_KEY=<hex_secret_key>
+NOSTR_PUBLIC_KEY=<hex_public_key>
+```
+
+### Step 2: Get NWC Connection String
+
+**Option A: Alby (Easiest)**
+1. Create account at getalby.com
+2. Go to Settings → Wallet Connections
+3. Click "Add a new connection"
+4. Set permissions: make_invoice, pay_invoice, get_balance
+5. Set daily budget (e.g., 10,000 sats)
+6. Copy the NWC connection string
+
+**Option B: LNbits**
+1. Access LNbits instance (or legend.lnbits.com)
+2. Create wallet
+3. Enable NWC extension
+4. Create connection, copy string
+
+**Option C: Own Node**
+- Umbrel, Start9, or Core Lightning with NWC plugin
+
+Add to `.env`:
+```
+NWC_URL=nostr+walletconnect://...
+```
+
+### Step 3: Connect and Test
+
+```javascript
+import { nwc } from '@getalby/sdk';
+
+const client = new nwc.NWCClient({
+  nostrWalletConnectUrl: process.env.NWC_URL,
+});
+
+// Test connection
+const balance = await client.getBalance();
+console.log('Balance:', balance.balance, 'sats');
+```
+
+## Payment Operations
+
+### Create Invoice (Receive)
+```javascript
+const invoice = await client.makeInvoice({
+  amount: 1000, // sats
+  description: 'Payment for AI service',
+  expiry: 3600, // 1 hour
+});
+console.log('Invoice:', invoice.invoice);
+```
+
+### Pay Invoice (Send)
+```javascript
+const result = await client.payInvoice({
+  invoice: 'lnbc...', // BOLT11 invoice
+});
+console.log('Payment preimage:', result.preimage);
+```
+
+### Check Balance
+```javascript
+const { balance } = await client.getBalance();
+console.log('Balance:', balance, 'sats');
+```
+
+### List Transactions
+```javascript
+const txs = await client.listTransactions({ limit: 10 });
+for (const tx of txs.transactions) {
+  console.log(`${tx.type}: ${tx.amount} sats`);
+}
+```
+
+## Nostr Communication
+
+### Send Encrypted DM
+```javascript
+import { finalizeEvent, nip04 } from 'nostr-tools';
+import { Relay } from 'nostr-tools/relay';
+
+const encrypted = await nip04.encrypt(secretKey, recipientPubkey, message);
+const event = finalizeEvent({
+  kind: 4,
+  created_at: Math.floor(Date.now() / 1000),
+  tags: [['p', recipientPubkey]],
+  content: encrypted,
+}, secretKey);
+
+const relay = await Relay.connect('wss://relay.damus.io');
+await relay.publish(event);
+relay.close();
+```
+
+### Post Public Note
+```javascript
+const event = finalizeEvent({
+  kind: 1,
+  created_at: Math.floor(Date.now() / 1000),
+  tags: [],
+  content: 'Hello from my AI agent!',
+}, secretKey);
+
+const relay = await Relay.connect('wss://relay.damus.io');
+await relay.publish(event);
+relay.close();
+```
+
+## Complete Agent Class
+
+```javascript
+import { hexToBytes } from '@noble/hashes/utils';
+import { getPublicKey, finalizeEvent, nip04 } from 'nostr-tools';
+import { Relay } from 'nostr-tools/relay';
+import { nwc } from '@getalby/sdk';
+
+export class BitcoinAgent {
+  constructor(config) {
+    this.secretKey = hexToBytes(config.secretKey);
+    this.publicKey = getPublicKey(this.secretKey);
+    this.wallet = new nwc.NWCClient({
+      nostrWalletConnectUrl: config.nwcUrl,
+    });
+    this.relays = config.relays || ['wss://relay.damus.io'];
+  }
+
+  async getBalance() {
+    const { balance } = await this.wallet.getBalance();
+    return balance;
+  }
+
+  async createInvoice(amount, description) {
+    const invoice = await this.wallet.makeInvoice({
+      amount,
+      description,
+      expiry: 3600,
+    });
+    return invoice.invoice;
+  }
+
+  async payInvoice(bolt11) {
+    const result = await this.wallet.payInvoice({ invoice: bolt11 });
+    return result.preimage;
+  }
+
+  async sendDM(recipientPubkey, message) {
+    const encrypted = await nip04.encrypt(
+      this.secretKey,
+      recipientPubkey,
+      message
+    );
+    const event = finalizeEvent({
+      kind: 4,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['p', recipientPubkey]],
+      content: encrypted,
+    }, this.secretKey);
+
+    const relay = await Relay.connect(this.relays[0]);
+    await relay.publish(event);
+    relay.close();
+    return event.id;
+  }
+
+  async postNote(content) {
+    const event = finalizeEvent({
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [],
+      content,
+    }, this.secretKey);
+
+    const relay = await Relay.connect(this.relays[0]);
+    await relay.publish(event);
+    relay.close();
+    return event.id;
+  }
+}
+
+// Usage
+const agent = new BitcoinAgent({
+  secretKey: process.env.NOSTR_SECRET_KEY,
+  nwcUrl: process.env.NWC_URL,
+});
+```
+
+## Recommended Relays
+
+- wss://relay.damus.io
+- wss://nos.lol
+- wss://relay.nostr.band
+- wss://nostr.wine
+- wss://relay.primal.net
+
+## Security Best Practices
+
+1. **Never expose nsec/secret key** in code or logs
+2. **Use environment variables** for all secrets
+3. **Set spending limits** in NWC connection
+4. **Use separate keys** for different agents
+5. **Rotate NWC connections** periodically
+6. **Monitor transactions** for unexpected activity
+
+## Error Handling
+
+```javascript
+try {
+  await client.payInvoice({ invoice: bolt11 });
+} catch (error) {
+  switch (error.code) {
+    case 'INSUFFICIENT_BALANCE':
+      console.log('Not enough sats');
+      break;
+    case 'PAYMENT_FAILED':
+      console.log('Could not route payment');
+      break;
+    case 'INVOICE_EXPIRED':
+      console.log('Invoice expired');
+      break;
+    default:
+      console.log('Error:', error.message);
+  }
+}
+```
+
+## Resources
+
+- Website: https://startwithbitcoin.com
+- Guides: https://startwithbitcoin.com/guides
+- GitHub: https://github.com/bramkanstein/startwithbitcoin
